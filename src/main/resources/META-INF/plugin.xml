@@ -1,0 +1,77 @@
+<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<idea-plugin>
+    <id>aborotto.querybook</id>
+    <name>QueryBook</name>
+
+    <vendor url="https://github.com/aborotto">aborotto</vendor>
+
+    <description><![CDATA[
+        <b>QueryBook</b> — your personal SQL library inside DataGrip and IntelliJ-based IDEs.<br><br>
+
+        Stop losing useful queries in editor history. QueryBook lets you save, organise and
+        instantly reuse SQL snippets without ever leaving your IDE.<br><br>
+
+        <b>Key features:</b>
+        <ul>
+            <li>📁 <b>Folder-based organisation</b> — group related queries in nested folders</li>
+            <li>🖱️ <b>Drag &amp; drop</b> — reorder and move queries between folders with a live visual indicator</li>
+            <li>🔍 <b>Live search</b> — filter by name or toggle to search inside SQL content</li>
+            <li>▶ <b>One-click execution</b> — run any saved query directly from the panel</li>
+            <li>📋 <b>Copy SQL</b> — copy to clipboard in a single click</li>
+            <li>🔁 <b>Duplicate</b> — clone a query as a starting point for variations</li>
+            <li>📤 <b>Export / Import</b> — back up your library to JSON and share with teammates</li>
+            <li>⌨️ <b>Keyboard shortcuts</b> — <code>Ctrl+Alt+Q</code> to save, <code>Delete</code> to delete, <code>F2</code> to rename</li>
+            <li>💡 <b>SQL preview tooltip</b> — hover a query to see its SQL without opening it</li>
+        </ul>
+    ]]></description>
+
+    <change-notes><![CDATA[
+        <b>1.0.0</b>
+        <ul>
+            <li>Initial release</li>
+            <li>Folder-based query organisation with drag &amp; drop reordering</li>
+            <li>Live search (name + SQL content toggle)</li>
+            <li>Export / Import to JSON</li>
+            <li>Duplicate query, Copy SQL, Capture from Editor</li>
+            <li>Keyboard shortcuts: Ctrl+Alt+Q, Delete, F2</li>
+        </ul>
+    ]]></change-notes>
+
+    <depends>com.intellij.modules.json</depends>
+    <depends>com.intellij.database</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="QueryBook"
+                    factoryClass="com.demo.ui.QueryToolWindowFactory"
+                    anchor="right"
+                    icon="AllIcons.Toolwindows.ToolWindowBookmarks"/>
+
+        <!-- Storage -->
+        <projectService serviceImplementation="com.demo.model.QueryStorage"/>
+
+        <!-- Sync -->
+        <applicationService serviceImplementation="com.demo.sync.QueryBookSyncSettings"/>
+        <projectService     serviceImplementation="com.demo.sync.QueryBookSyncService"/>
+
+        <!-- Settings page: IDE Settings → Tools → QueryBook Sync -->
+        <applicationConfigurable
+                parentId="tools"
+                instance="com.demo.sync.QueryBookSettingsConfigurable"
+                id="querybook.sync.settings"
+                displayName="QueryBook Sync"/>
+
+        <!-- Balloon notifications -->
+        <notificationGroup id="QueryBook" displayType="BALLOON" isLogByDefault="false"/>
+    </extensions>
+
+    <actions>
+        <action id="com.querybook.SaveQueryAction"
+                class="com.demo.action.SaveQueryAction"
+                text="Save to QueryBook"
+                description="Save the selected (or entire) SQL to QueryBook">
+            <add-to-group group-id="EditorPopupMenu" anchor="first"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt Q"/>
+        </action>
+    </actions>
+</idea-plugin>
+
