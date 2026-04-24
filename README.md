@@ -4,16 +4,16 @@ A plugin for DataGrip and IntelliJ-based IDEs that lets you save, organize, and 
 
 ## Features
 
-- **Folder organization** — Organize queries in nested folders, no depth limit
-- **Drag & drop** — Reorder and move queries between folders with drop indicators
-- **Search** — Filter by name or SQL code content
-- **Execute queries** — Run saved queries directly as DataGrip scratch files
-- **Copy to clipboard** — One-click SQL copy
-- **Duplicate queries** — Create variations from existing snippets
-- **Export / Import** — Portable JSON backups and team sharing
-- **Keyboard shortcuts** — `Ctrl+Alt+Q` to save, `Delete` to delete, `F2` to rename
-- **Query preview** — Hover to see SQL without opening
-- **Folder counts** — Shows direct children count per folder
+- **Folder organization** - Organize queries in nested folders, no depth limit
+- **Drag & drop** - Reorder and move queries between folders with drop indicators
+- **Search** - Filter by name or SQL code content
+- **Execute queries** - Run saved queries directly as DataGrip scratch files
+- **Copy to clipboard** - One-click SQL copy
+- **Duplicate queries** - Create variations from existing snippets
+- **Export / Import** - Portable JSON backups and team sharing
+- **Keyboard shortcuts** - `Ctrl+Alt+Q` to save, `Delete` to delete, `F2` to rename
+- **Query preview** - Hover to see SQL without opening
+- **Folder counts** - Shows direct children count per folder
 
 ## Keyboard Shortcuts
 
@@ -40,12 +40,12 @@ Download the latest `.zip` from [Releases](https://github.com/aborotto/querybook
 ## Quick Start
 
 ### Open the panel
-Go to **View → Tool Windows → QueryBook** or click the bookmark icon on the right sidebar.
+Go to View → Tool Windows → QueryBook or click the bookmark icon on the right sidebar.
 
 ### Save a query
 Three ways to save:
 - Select SQL text and press `Ctrl+Alt+Q`
-- Select SQL and right-click → **Save to QueryBook**
+- Select SQL and right-click → Save to QueryBook
 - Click the capture button in the QueryBook toolbar
 
 The save dialog lets you name the query and choose the target folder.
@@ -69,8 +69,8 @@ Click **Export to JSON** in the toolbar. Your entire library is saved as a singl
 
 ### Import
 Click **Import from JSON** and select a previously exported file. Choose:
-- **Merge** — Add imported queries alongside existing ones
-- **Replace** — Clear library and replace with imported data
+- **Merge** - Add imported queries alongside existing ones
+- **Replace** - Clear library and replace with imported data
 
 This is useful for backups and sharing with teammates.
 
@@ -146,12 +146,12 @@ cd querybook
 
 Planned features in development:
 
-- [ ] **Cloud sharing** — Share and sync queries across devices and team members
-- [ ] **Tags / Labels** — Tag queries for cross-folder filtering
-- [ ] **Search highlighting** — Highlight matches in the editor when selecting search results
-- [ ] **Settings page** — Configure defaults, shortcuts, and UI behavior
-- [ ] **Bulk operations** — Multi-select for deleting or moving multiple queries at once
-- [ ] **Markdown descriptions** — Render query descriptions as formatted markdown
+- [ ] **Cloud sharing** - Share and sync queries across devices and team members
+- [ ] **Tags / Labels** - Tag queries for cross-folder filtering
+- [ ] **Search highlighting** - Highlight matches in the editor when selecting search results
+- [ ] **Settings page** - Configure defaults, shortcuts, and UI behavior
+- [ ] **Bulk operations** - Multi-select for deleting or moving multiple queries at once
+- [ ] **Markdown descriptions** - Render query descriptions as formatted markdown
 
 ## License
 
