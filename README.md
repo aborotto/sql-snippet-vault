@@ -1,93 +1,61 @@
-# QueryBook 📖
+# QueryBook
 
-> **Your personal SQL library, always at your fingertips — right inside DataGrip and IntelliJ-based IDEs.**
+A plugin for DataGrip and IntelliJ-based IDEs that lets you save, organize, and reuse SQL snippets without leaving the editor.
 
-Stop losing useful queries in editor history or scattered across files.  
-QueryBook lets you save, organise, search and reuse SQL snippets without ever leaving your IDE.
+## Features
 
----
+- **Folder organization** — Group queries in nested folders
+- **Drag & drop** — Reorder and move queries between folders
+- **Search** — Filter by name or SQL content
+- **Execute queries** — Run saved queries directly as scratch files
+- **Copy SQL** — Quick clipboard access
+- **Duplicate** — Clone queries as starting points
+- **Export / Import** — JSON-based backup and sharing
+- **Keyboard shortcuts** — `Ctrl+Alt+Q` to save, `Delete` to delete, `F2` to rename
+- **SQL preview** — Hover to preview query bodies
+- **Folder counts** — Live child count badges
 
-## ✨ Features
-
-| Feature | Description |
-|---|---|
-| 📁 **Folder organisation** | Group related queries in nested folders — unlimited depth |
-| 🖱️ **Drag & drop** | Reorder and move queries between folders with a live visual drop indicator |
-| 🔍 **Live search** | Filter by name; toggle **SQL mode** to also search inside query bodies |
-| ▶ **One-click execution** | Run any saved query directly from the panel as a DataGrip scratch file |
-| 📋 **Copy SQL** | Copy a query's SQL to clipboard in a single click |
-| 🔁 **Duplicate** | Clone a query as a starting point for variations |
-| 📤 **Export / Import** | Back up your library to a portable JSON file and share it with teammates |
-| ⌨️ **Keyboard shortcuts** | `Ctrl+Alt+Q` to save, `Delete` to delete, `F2` to rename |
-| 💡 **SQL preview tooltip** | Hover any query node to peek at its SQL without opening it |
-| 🏷️ **Folder badges** | Folders show a live count of their direct children |
-
----
-
-## ⌨️ Keyboard Shortcuts
+## Keyboard Shortcuts
 
 | Shortcut | Action |
 |---|---|
-| `Ctrl+Alt+Q` | Save active editor's SQL (or selection) to QueryBook |
-| `Delete` / `Backspace` | Delete selected query or folder |
-| `F2` | Rename selected query or folder |
-| `Double-click` | Rename selected item |
-| Right-click | Open context menu (New, Rename, Delete, Duplicate, Copy SQL) |
+| `Ctrl+Alt+Q` | Save editor content to QueryBook |
+| `Delete` | Delete selected item |
+| `F2` | Rename selected item |
+| `Double-click` | Rename |
+| `Right-click` | Context menu |
 
----
+## Installation
 
-## 📦 Installation
-
-### From JetBrains Marketplace *(recommended)*
-1. Open **Settings → Plugins → Marketplace**
+### JetBrains Marketplace (recommended)
+1. Settings → Plugins → Marketplace
 2. Search for **QueryBook**
-3. Click **Install** and restart the IDE
+3. Click Install and restart
 
-### Manual installation
-1. Download the latest `.zip` from the [Releases](https://github.com/aborotto/querybook/releases) page
-2. Open **Settings → Plugins → ⚙️ → Install Plugin from Disk…**
-3. Select the downloaded `.zip` file and restart the IDE
+### Manual
+Download the latest `.zip` from [Releases](https://github.com/aborotto/querybook/releases), then:
+1. Settings → Plugins → ⚙️ → Install Plugin from Disk
+2. Select the file and restart
 
----
+## Quick Start
 
-## 🚀 Quick Start
+1. **Open the panel** — View → Tool Windows → QueryBook
 
-### 1 — Open the panel
-Go to **View → Tool Windows → QueryBook** (or click the bookmark icon on the right sidebar).
+2. **Save a query** — Select SQL and press `Ctrl+Alt+Q` (or right-click → Save to QueryBook)
 
-### 2 — Save your first query
-Three ways to save a query:
+3. **Organize** — Use folders to group related queries. Drag and drop to reorganize.
 
-| Method | How |
-|---|---|
-| **Keyboard** | Select SQL in any editor → `Ctrl+Alt+Q` |
-| **Right-click** | Select SQL → right-click → **Save to QueryBook** |
-| **Capture button** | Click ⬇ in the QueryBook toolbar to grab the active editor's content |
+4. **Run a query** — Select any query and click the Run button. It opens as a scratch file.
 
-The save dialog lets you **name** the query and choose the **target folder**.
+5. **Search** — Type in the search box. Toggle SQL mode to search query bodies.
 
-### 3 — Organise with folders
-- Click **+ New Folder** in the toolbar (or right-click in the tree)
-- **Drag and drop** queries and folders to reorganise them
-  - Drop on the **top half** of a row → insert *before* that item
-  - Drop on the **bottom half** of a folder → move *into* the folder
+## Export & Import
 
-### 4 — Run a query
-Select any query in the tree → click **▶ Run Query** in the right panel.  
-QueryBook opens it as a scratch SQL file and triggers DataGrip's execute action automatically.
+Click the **Export** button to save your library as JSON. Click **Import** to restore from a previously exported file.
 
-### 5 — Search
-Type in the search box to filter by name.  
-Click the **SQL** toggle button to also match against query bodies.
+Choose to **merge** the imported queries with existing ones or **replace** the entire library.
 
----
-
-## 📤 Export & Import
-
-### Export
-Click the **↑ Export to JSON** button in the toolbar.  
-Your entire library is saved to a single, human-readable `.json` file.
-
+Example export format:
 ```json
 {
   "version": 1,
@@ -100,87 +68,45 @@ Your entire library is saved to a single, human-readable `.json` file.
         "name": "Get all users",
         "sqlCode": "SELECT * FROM users ORDER BY created_at DESC",
         "description": "Daily monitoring query",
-        "isFolder": false,
-        "createdAt": 1744286000000,
-        "children": []
+        "isFolder": false
       }
     ]
   }
 }
 ```
 
-### Import
-Click the **↓ Import from JSON** button and select a previously exported file.  
-Choose between:
-- **Merge** — adds imported queries alongside your existing ones
-- **Replace** — clears your library and replaces it with the imported data
-
----
-
-## 🗂️ Project Structure
+## Project Structure
 
 ```
-src/
-└── main/
-    ├── kotlin/com/demo/
-    │   ├── action/
-    │   │   ├── SaveQueryAction.kt          ← Ctrl+Alt+Q / right-click save
-    │   │   └── SaveToQueryBookDialog.kt    ← Name + folder picker dialog
-    │   ├── model/
-    │   │   ├── QueryNode.kt                ← Data model (queries & folders)
-    │   │   ├── QueryStorage.kt             ← Persistent state service
-    │   │   └── QueryEvents.kt              ← Message bus event
-    │   ├── service/
-    │   │   └── QueryImportExportService.kt ← JSON export / import
-    │   └── ui/
-    │       ├── QueryToolWindowFactory.kt   ← Tool window entry point
-    │       ├── QueryTreePanel.kt           ← Left panel: tree + search + DnD
-    │       └── QueryEditorPanel.kt         ← Right panel: SQL editor + run
-    └── resources/
-        └── META-INF/plugin.xml
+src/main/kotlin/com/demo/
+├── action/               # Saving and dialogs
+├── model/                # Data models and storage
+├── service/              # Import/export logic
+└── ui/                   # UI components (tree, editor, tool window)
 ```
 
----
+## Development
 
-## 🔧 Development
+Prerequisites: JDK 21+, IntelliJ IDEA or DataGrip
 
-### Prerequisites
-- **JDK 21** or later
-- **IntelliJ IDEA** (any edition) or **DataGrip**
-
-### Run the plugin locally
 ```bash
 git clone https://github.com/aborotto/querybook.git
 cd querybook
-./gradlew runIde          # opens a sandboxed DataGrip instance
+./gradlew runIde          # Run plugin locally
+./gradlew buildPlugin     # Build distribution zip
+./gradlew verifyPlugin    # Verify compatibility
 ```
 
-### Build the distributable
-```bash
-./gradlew buildPlugin     # output: build/distributions/QueryBook-*.zip
-```
+## Roadmap
 
-### Verify compatibility
-```bash
-./gradlew verifyPlugin
-```
+- [ ] **Cloud sharing** — Share and sync queries across devices
+- [ ] **Tags / Labels** — Tag queries for cross-folder filtering
+- [ ] **Search highlight** — Highlight matches in the editor
+- [ ] **Settings page** — Configure defaults and behavior
+- [ ] **Multi-select** — Bulk operations on multiple queries
+- [ ] **Markdown descriptions** — Render notes as formatted markdown
 
----
-
-## 🛣️ Roadmap
-
-- [ ] **Tags / Labels** — tag queries with custom labels for cross-folder filtering
-- [ ] **Search highlight** — highlight matching text in the editor when a search result is selected
-- [ ] **Settings page** — configure default folder, shortcuts, auto-expand behaviour
-- [ ] **Multi-select** — select multiple queries for bulk move / delete
-- [ ] **Markdown descriptions** — render the notes field as formatted markdown
-
----
-
-## 📄 License
+## License
 
 MIT License — see [LICENSE](LICENSE) for details.
 
----
-
-*Built with ❤️ using the [IntelliJ Platform SDK](https://plugins.jetbrains.com/docs/intellij/)*
