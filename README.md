@@ -1,4 +1,4 @@
-# QueryBook
+# SQLFolio
 
 A plugin for DataGrip and IntelliJ-based IDEs that lets you save, organize, and reuse SQL snippets without leaving the editor.
 
