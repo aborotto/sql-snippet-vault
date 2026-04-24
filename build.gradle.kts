@@ -4,7 +4,7 @@ plugins {
     alias(libs.plugins.intellijPlatform)
 }
 
-group   = "com.querybook"
+group   = "com.sqlfolio"
 version = "1.0.0"
 
 // Set the JVM language level used to build the project.

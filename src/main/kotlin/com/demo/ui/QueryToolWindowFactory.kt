@@ -15,6 +15,8 @@ import javax.swing.JSplitPane
  * Delegates all UI construction to [QueryBookPanel].
  */
 class QueryToolWindowFactory : ToolWindowFactory {
+    override fun shouldBeAvailable(project: Project): Boolean = true
+
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         val panel = QueryBookPanel(project)
         val content = ContentFactory.getInstance().createContent(panel.component, "", false)
