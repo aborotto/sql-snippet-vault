@@ -38,8 +38,8 @@ Download from JetBrains Marketplace or install manually from [Releases](https://
 Prerequisites: JDK 21+, IntelliJ IDEA or DataGrip
 
 ```bash
-git clone https://github.com/aborotto/querybook.git
-cd querybook
+git clone https://github.com/aborotto/SQLFolio.git
+cd SQLFolio
 ./gradlew runIde
 ```
 
