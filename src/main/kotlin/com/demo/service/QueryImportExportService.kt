@@ -13,7 +13,7 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
 /**
- * Handles JSON export and import of the entire QueryBook tree.
+ * Handles JSON export and import of the entire SQLFolio tree.
  *
  * Export format (version 1):
  * {
@@ -38,12 +38,12 @@ object QueryImportExportService {
 
     fun export(project: Project, storage: QueryStorage) {
         val descriptor = FileSaverDescriptor(
-            "Export QueryBook",
+            "Export SQLFolio",
             "Save your entire query library as a portable JSON file",
             "json"
         )
         val dialog = FileChooserFactory.getInstance().createSaveFileDialog(descriptor, project)
-        val defaultName = "querybook_${LocalDateTime.now().format(timestampFmt)}"
+        val defaultName = "sqlfolio_${LocalDateTime.now().format(timestampFmt)}"
         val fileWrapper = dialog.save(null as com.intellij.openapi.vfs.VirtualFile?, defaultName) ?: return
 
         try {
@@ -65,8 +65,8 @@ object QueryImportExportService {
 
     fun import(project: Project, storage: QueryStorage, onComplete: () -> Unit) {
         val descriptor = FileChooserDescriptorFactory.createSingleFileDescriptor("json").apply {
-            title = "Import QueryBook"
-            description = "Select a QueryBook JSON export file"
+            title = "Import SQLFolio"
+            description = "Select a SQLFolio JSON export file"
         }
 
         FileChooser.chooseFile(descriptor, project, null) { virtualFile ->
@@ -84,7 +84,7 @@ object QueryImportExportService {
                             "How do you want to import?\n\n" +
                             "  Merge   — add to your existing library\n" +
                             "  Replace — overwrite everything with the imported data",
-                    "Import QueryBook",
+                    "Import SQLFolio",
                     "Merge",
                     "Replace",
                     "Cancel",
