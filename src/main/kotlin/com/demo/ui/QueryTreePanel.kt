@@ -3,7 +3,7 @@ package com.demo.ui
 import com.demo.model.QueryNode
 import com.demo.model.QueryStorage
 import com.demo.model.QuerySavedListener
-import com.demo.action.SaveToQueryBookDialog
+import com.demo.action.SaveToSQLFolioDialog
 import com.demo.service.QueryImportExportService
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionManager
@@ -150,7 +150,7 @@ class QueryTreePanel(
             addSeparator()
             add(object : AnAction(
                 "Capture from Editor",
-                "Save the active editor's SQL (or selection) to QueryBook  [Ctrl+Alt+Q]",
+                "Save the active editor's SQL (or selection) to SQLFolio  [Ctrl+Alt+Q]",
                 AllIcons.Actions.Download
             ) {
                 override fun actionPerformed(e: AnActionEvent) = captureFromEditor()
@@ -171,7 +171,7 @@ class QueryTreePanel(
             })
         }
         val toolbar = ActionManager.getInstance()
-            .createActionToolbar("QueryBookToolbar", group, true)
+            .createActionToolbar("SQLFolioToolbar", group, true)
             .also { it.targetComponent = component }
 
         component.add(
@@ -300,13 +300,13 @@ class QueryTreePanel(
 
     /**
      * Grabs SQL from the currently active editor (selected text or full document)
-     * and opens the QueryBook save dialog so the user can name it and pick a folder.
-     * This is the one-click alternative to right-click → Save to QueryBook.
+     * and opens the SQLFolio save dialog so the user can name it and pick a folder.
+     * This is the one-click alternative to right-click → Save to SQLFolio.
      */
     private fun captureFromEditor() {
         val editor = FileEditorManager.getInstance(project).selectedTextEditor
         if (editor == null) {
-            Messages.showInfoMessage(project, "No active editor found.\nOpen a SQL file or console first.", "QueryBook")
+            Messages.showInfoMessage(project, "No active editor found.\nOpen a SQL file or console first.", "SQLFolio")
             return
         }
 
@@ -316,11 +316,11 @@ class QueryTreePanel(
             editor.document.text
 
         if (sql.isBlank()) {
-            Messages.showInfoMessage(project, "The active editor is empty.", "QueryBook")
+            Messages.showInfoMessage(project, "The active editor is empty.", "SQLFolio")
             return
         }
 
-        val dialog = SaveToQueryBookDialog(project, storage)
+        val dialog = SaveToSQLFolioDialog(project, storage)
         if (!dialog.showAndGet()) return
 
         dialog.targetFolder.children.add(

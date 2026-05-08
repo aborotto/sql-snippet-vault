@@ -15,10 +15,10 @@ import javax.swing.JPanel
 import javax.swing.JTextField
 
 /**
- * Dialog for saving a SQL snippet to QueryBook.
+ * Dialog for saving a SQL snippet to SQLFolio.
  * Lets the user set a name and pick a target folder (or root).
  */
-class SaveToQueryBookDialog(
+class SaveToSQLFolioDialog(
     project: Project,
     private val storage: QueryStorage,
     prefilledName: String = ""
@@ -31,7 +31,7 @@ class SaveToQueryBookDialog(
     private val folderCombo: ComboBox<String>
 
     init {
-        title = "Save to QueryBook"
+        title = "Save to SQLFolio"
 
         val list = mutableListOf<QueryNode?>(null) // index 0 → root
         collectFolders(storage.root, list)

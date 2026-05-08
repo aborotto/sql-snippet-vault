@@ -5,7 +5,7 @@ plugins {
 }
 
 group   = "com.sqlfolio"
-version = "1.0.0"
+version = "1.2.0"
 
 // Set the JVM language level used to build the project.
 kotlin {
@@ -20,6 +20,10 @@ repositories {
 }
 
 dependencies {
+    // BYOB back-end drivers — bundled into the plugin JAR
+    implementation("org.postgresql:postgresql:42.7.3")
+    implementation("org.xerial:sqlite-jdbc:3.45.3.0")
+
     intellijPlatform {
         datagrip(providers.gradleProperty("platformVersion"))
         testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)

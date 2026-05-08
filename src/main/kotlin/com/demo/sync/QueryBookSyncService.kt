@@ -29,36 +29,33 @@ enum class SyncStatus(val label: String) {
 // ── Service ────────────────────────────────────────────────────────────────────
 
 /**
- * Project-level service that owns the full sync lifecycle:
+ * Project-level service that owns the full sync lifecycle.
  *
- *  • Polls the server every [QueryBookSyncSettings.syncIntervalSeconds] seconds (pull).
- *  • Debounces every local mutation and pushes 2 s after the last change.
- *  • Handles conflict resolution via a dialog.
- *  • Exposes a [status] property + [onStatusChanged] callback for the toolbar indicator.
+ * Back-end is resolved at connect-time via [SQLFolioSyncSettings.buildBackend],
+ * so users can switch between REST, PostgreSQL, and SQLite without any code change.
  *
  * Thread model
  * ─────────────
- *  All HTTP calls run on a bounded background executor (never the EDT).
+ *  All back-end calls run on a bounded background executor (never the EDT).
  *  Storage mutations and UI updates are marshalled back to the EDT via
  *  [UIUtil.invokeLaterIfNeeded].
  */
 @Service(Service.Level.PROJECT)
-class QueryBookSyncService(private val project: Project) : Disposable {
+class SQLFolioSyncService(private val project: Project) : Disposable {
 
-    // Dedicated single-thread executor — keeps HTTP serialised and avoids flood
     private val executor = AppExecutorUtil.createBoundedScheduledExecutorService(
-        "QueryBook-sync", 1
+        "SQLFolio-sync", 1
     )
 
     private var pollFuture:     ScheduledFuture<*>? = null
     private var debounceFuture: ScheduledFuture<*>? = null
 
     @Volatile private var connected = false
+    @Volatile private var backend: SyncBackend? = null
 
-    // Gson instance for deep-copy (thread-safe for reads)
     private val gson = GsonBuilder().create()
 
-    val settings get() = QueryBookSyncSettings.getInstance()
+    val settings get() = SQLFolioSyncSettings.getInstance()
     private val storage get() = QueryStorage.getInstance(project)
 
     // ── Status ────────────────────────────────────────────────────────────────
@@ -80,15 +77,19 @@ class QueryBookSyncService(private val project: Project) : Disposable {
      */
     fun connect() {
         if (connected) return
-        if (!settings.syncEnabled
-            || settings.serverUrl.isBlank()
-            || settings.workspaceId.isBlank()
-            || settings.apiToken.isBlank()
-        ) {
+        if (!settings.syncEnabled || settings.workspaceId.isBlank()) {
             status = SyncStatus.DISCONNECTED
             return
         }
+        val b = settings.buildBackend()
+        if (b == null) {
+            status = SyncStatus.DISCONNECTED
+            return
+        }
+        backend  = b
         connected = true
+        // Start real-time listener (PostgreSQL NOTIFY / SQLite WatchService)
+        b.startListening { executor.submit { doPull() } }
         // Immediate initial pull on a background thread
         executor.submit { doPull() }
         // Schedule periodic polling
@@ -101,16 +102,15 @@ class QueryBookSyncService(private val project: Project) : Disposable {
     /** Stop polling and clear all timers. */
     fun disconnect() {
         connected = false
+        backend?.stopListening()
+        backend   = null
         pollFuture?.cancel(false);     pollFuture     = null
         debounceFuture?.cancel(false); debounceFuture = null
         status = SyncStatus.DISCONNECTED
     }
 
     /** Re-read settings and reconnect (called after settings are applied). */
-    fun reconnect() {
-        disconnect()
-        connect()
-    }
+    fun reconnect() { disconnect(); connect() }
 
     // ── Mutations notification ─────────────────────────────────────────────────
 
@@ -138,24 +138,22 @@ class QueryBookSyncService(private val project: Project) : Disposable {
     private fun schedulePush() {
         // Capture a snapshot on the EDT where storage is safe to read
         ApplicationManager.getApplication().invokeAndWait {
-            val version    = settings.lastSyncedVersion
-            val rootCopy   = deepCopy(storage.root)
+            val version  = settings.lastSyncedVersion
+            val rootCopy = deepCopy(storage.root)
             executor.submit { doPush(version, rootCopy) }
         }
     }
 
     private fun doPush(version: Int, rootSnapshot: QueryNode) {
+        val b = backend ?: return
         status = SyncStatus.SYNCING
         try {
-            val resp = QueryBookApiClient.push(
-                settings.serverUrl, settings.apiToken, settings.workspaceId,
-                version, rootSnapshot
-            )
-            if (resp.conflict && resp.root != null) {
+            val result = b.push(settings.workspaceId, version, rootSnapshot)
+            if (result.conflict && result.root != null) {
                 status = SyncStatus.CONFLICT
-                handleConflict(resp.version, resp.root)
+                handleConflict(result.version, result.root)
             } else {
-                settings.lastSyncedVersion = resp.version
+                settings.lastSyncedVersion = result.version
                 status = SyncStatus.SYNCED
             }
         } catch (e: Exception) {
@@ -165,11 +163,10 @@ class QueryBookSyncService(private val project: Project) : Disposable {
     }
 
     private fun doPull() {
+        val b = backend ?: return
         status = SyncStatus.SYNCING
         try {
-            val snapshot = QueryBookApiClient.pull(
-                settings.serverUrl, settings.apiToken, settings.workspaceId
-            )
+            val snapshot = b.pull(settings.workspaceId)
             if (snapshot.version > settings.lastSyncedVersion) {
                 settings.lastSyncedVersion = snapshot.version
                 UIUtil.invokeLaterIfNeeded {
@@ -179,7 +176,7 @@ class QueryBookSyncService(private val project: Project) : Disposable {
                         .syncPublisher(QuerySavedListener.TOPIC)
                         .querySaved()
                     showBalloon(
-                        "QueryBook updated from server (v${snapshot.version})",
+                        "SQLFolio updated from server (v${snapshot.version})",
                         NotificationType.INFORMATION
                     )
                 }
@@ -197,17 +194,16 @@ class QueryBookSyncService(private val project: Project) : Disposable {
         UIUtil.invokeLaterIfNeeded {
             val choice = Messages.showYesNoCancelDialog(
                 project,
-                "Your QueryBook is behind the server (server is at v$serverVersion).\n\n" +
+                "Your SQLFolio is behind the server (server is at v$serverVersion).\n\n" +
                 "• Keep Mine   — overwrite the server with your current version\n" +
                 "• Take Server — replace your local library with the server's version\n" +
                 "• Cancel      — do nothing (you will be prompted again next sync)",
-                "QueryBook Sync Conflict",
+                "SQLFolio Sync Conflict",
                 "Keep Mine", "Take Server", "Cancel",
                 Messages.getWarningIcon()
             )
             when (choice) {
                 Messages.YES -> {
-                    // Force-push: bump our known version to server's so the push won't be rejected again
                     settings.lastSyncedVersion = serverVersion
                     executor.submit { schedulePush() }
                 }
@@ -220,7 +216,6 @@ class QueryBookSyncService(private val project: Project) : Disposable {
                         .querySaved()
                     status = SyncStatus.SYNCED
                 }
-                // Cancel: leave status as CONFLICT so the indicator stays visible
             }
         }
     }
@@ -234,8 +229,8 @@ class QueryBookSyncService(private val project: Project) : Disposable {
     private fun showBalloon(message: String, type: NotificationType) {
         UIUtil.invokeLaterIfNeeded {
             NotificationGroupManager.getInstance()
-                .getNotificationGroup("QueryBook")
-                .createNotification("QueryBook Sync", message, type)
+                .getNotificationGroup("SQLFolio")
+                .createNotification("SQLFolio Sync", message, type)
                 .notify(project)
         }
     }
@@ -246,8 +241,8 @@ class QueryBookSyncService(private val project: Project) : Disposable {
     }
 
     companion object {
-        fun getInstance(project: Project): QueryBookSyncService =
-            project.getService(QueryBookSyncService::class.java)
+        fun getInstance(project: Project): SQLFolioSyncService =
+            project.getService(SQLFolioSyncService::class.java)
     }
 }
 

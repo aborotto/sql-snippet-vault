@@ -9,20 +9,20 @@ import java.net.http.HttpResponse
 import java.time.Duration
 
 /**
- * Low-level HTTP client for the QueryBook sync REST API.
+ * Low-level HTTP client for the SQLFolio sync REST API.
  *
  * ─── Server API contract ────────────────────────────────────────────────────
  *
- *  GET  /api/querybook/health
+ *  GET  /api/sqlfolio/health
  *       → 200 { "status": "ok" }
  *
- *  GET  /api/querybook/workspaces/{workspaceId}
+ *  GET  /api/sqlfolio/workspaces/{workspaceId}
  *       Headers: Authorization: Bearer {token}
  *       → 200 { "version": 5, "root": { ...QueryNode tree... } }
  *       → 404 workspace not found (first push will create it)
  *       → 401 bad token
  *
- *  PUT  /api/querybook/workspaces/{workspaceId}
+ *  PUT  /api/sqlfolio/workspaces/{workspaceId}
  *       Headers: Authorization: Bearer {token}, Content-Type: application/json
  *       Body:    { "version": 5, "root": { ...QueryNode tree... } }
  *       → 200 { "version": 6, "conflict": false }           — accepted
@@ -33,7 +33,7 @@ import java.time.Duration
  * the server MUST return 409 with the latest tree so the client can resolve.
  * ────────────────────────────────────────────────────────────────────────────
  */
-object QueryBookApiClient {
+object SQLFolioApiClient {
 
     private val gson = GsonBuilder().create()
     private val http: HttpClient = HttpClient.newBuilder()
@@ -64,7 +64,7 @@ object QueryBookApiClient {
     /** Fetch the latest workspace state from the server. */
     @Throws(Exception::class)
     fun pull(serverUrl: String, apiToken: String, workspaceId: String): WorkspaceSnapshot {
-        val url = "${serverUrl.trimEnd('/')}/api/querybook/workspaces/$workspaceId"
+        val url = "${serverUrl.trimEnd('/')}/api/sqlfolio/workspaces/$workspaceId"
         val raw = get(url, apiToken)
         return when (raw.status) {
             200  -> gson.fromJson(raw.body, WorkspaceSnapshot::class.java)
@@ -84,7 +84,7 @@ object QueryBookApiClient {
         version: Int,
         root: QueryNode
     ): PushResponse {
-        val url  = "${serverUrl.trimEnd('/')}/api/querybook/workspaces/$workspaceId"
+        val url  = "${serverUrl.trimEnd('/')}/api/sqlfolio/workspaces/$workspaceId"
         val body = gson.toJson(PushRequest(version, root))
         val raw  = put(url, apiToken, body)
         return when (raw.status) {
@@ -99,7 +99,7 @@ object QueryBookApiClient {
     /** Quick reachability + auth check used by the Settings panel "Test Connection" button. */
     @Throws(Exception::class)
     fun testConnection(serverUrl: String, apiToken: String): Boolean {
-        val url = "${serverUrl.trimEnd('/')}/api/querybook/health"
+        val url = "${serverUrl.trimEnd('/')}/api/sqlfolio/health"
         val raw = get(url, apiToken)
         return raw.status in 200..299
     }

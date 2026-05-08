@@ -22,10 +22,20 @@
             <li><b>Export / Import</b> — back up your library to JSON and share with teammates</li>
             <li><b>Keyboard shortcuts</b> — <code>Ctrl+Alt+Q</code> to save, <code>Delete</code> to delete, <code>F2</code> to rename</li>
             <li><b>SQL preview tooltip</b> — hover a query to see its SQL without opening it</li>
+            <li><b>Team sync (BYOB)</b> — share your library in real-time via your own PostgreSQL, SQLite or REST server</li>
         </ul>
     ]]></description>
 
     <change-notes><![CDATA[
+        <b>1.2.0</b>
+        <ul>
+            <li><b>BYOB Sync</b> — bring your own backend: connect via REST API, PostgreSQL or SQLite</li>
+            <li><b>Real-time sync</b> — PostgreSQL uses LISTEN/NOTIFY (≤ 200 ms), SQLite uses file watcher (≤ 1 s)</li>
+            <li><b>Version history</b> — every push archives the previous snapshot; configurable retention (default: last 10)</li>
+            <li><b>Sync status bar</b> — live status indicator at the bottom of the panel with Push Now / Pull Now buttons</li>
+            <li><b>Schema info</b> — settings page shows the exact DDL with a Copy SQL button</li>
+            <li>Auto-connect on project open</li>
+        </ul>
         <b>1.1.0</b>
         <ul>
             <li>Renamed plugin to SQLFolio</li>
@@ -57,18 +67,21 @@
         <projectService serviceImplementation="com.demo.model.QueryStorage"/>
 
         <!-- Sync -->
-        <applicationService serviceImplementation="com.demo.sync.QueryBookSyncSettings"/>
-        <projectService     serviceImplementation="com.demo.sync.QueryBookSyncService"/>
+        <applicationService serviceImplementation="com.demo.sync.SQLFolioSyncSettings"/>
+        <projectService     serviceImplementation="com.demo.sync.SQLFolioSyncService"/>
 
         <!-- Settings page: IDE Settings → Tools → SQLFolio Sync -->
         <applicationConfigurable
                 parentId="tools"
-                instance="com.demo.sync.QueryBookSettingsConfigurable"
-                id="querybook.sync.settings"
+                instance="com.demo.sync.SQLFolioSettingsConfigurable"
+                id="sqlfolio.sync.settings"
                 displayName="SQLFolio Sync"/>
 
         <!-- Balloon notifications -->
         <notificationGroup id="SQLFolio" displayType="BALLOON" isLogByDefault="false"/>
+
+        <!-- Auto-connect sync on project open -->
+        <postStartupActivity implementation="com.demo.sync.SQLFolioStartupActivity"/>
     </extensions>
 
     <actions>

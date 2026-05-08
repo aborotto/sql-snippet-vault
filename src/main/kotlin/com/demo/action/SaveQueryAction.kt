@@ -9,12 +9,12 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
 
 /**
- * Saves SQL to QueryBook.
+ * Saves SQL to SQLFolio.
  *
  * • If text is selected in the editor → saves the selection.
  * • If nothing is selected            → saves the entire document.
  *
- * Triggered via right-click → "Save to QueryBook"
+ * Triggered via right-click → "Save to SQLFolio"
  * or the keyboard shortcut  Ctrl+Alt+Q.
  */
 class SaveQueryAction : AnAction() {
@@ -40,7 +40,7 @@ class SaveQueryAction : AnAction() {
         if (sql.isBlank()) return
 
         val storage = QueryStorage.getInstance(project)
-        val dialog  = SaveToQueryBookDialog(project, storage)
+        val dialog  = SaveToSQLFolioDialog(project, storage)
 
         if (!dialog.showAndGet()) return   // user cancelled
 
