@@ -94,7 +94,7 @@ class SQLFolioSyncService(private val project: Project) : Disposable {
         executor.submit { doPull() }
         // Schedule periodic polling
         val interval = settings.syncIntervalSeconds.toLong().coerceAtLeast(10)
-        pollFuture = executor.scheduleAtFixedRate(
+        pollFuture = executor.scheduleAtFixedDelay(
             { doPull() }, interval, interval, TimeUnit.SECONDS
         )
     }
