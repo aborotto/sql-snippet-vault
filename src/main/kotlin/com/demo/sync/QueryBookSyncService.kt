@@ -94,7 +94,7 @@ class SQLFolioSyncService(private val project: Project) : Disposable {
         executor.submit { doPull() }
         // Schedule periodic polling
         val interval = settings.syncIntervalSeconds.toLong().coerceAtLeast(10)
-        pollFuture = executor.scheduleWithFixedDelay(
+        pollFuture = executor.scheduleAtFixedDelay(
             { doPull() }, interval, interval, TimeUnit.SECONDS
         )
     }
@@ -245,4 +245,3 @@ class SQLFolioSyncService(private val project: Project) : Disposable {
             project.getService(SQLFolioSyncService::class.java)
     }
 }
-
