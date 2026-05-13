@@ -3,8 +3,10 @@ package com.demo.sync
 import com.demo.model.QueryNode
 import com.google.gson.GsonBuilder
 import org.postgresql.PGConnection
+import java.net.URLDecoder
 import java.sql.Connection
 import java.sql.DriverManager
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 
 /**
@@ -44,6 +46,14 @@ class DatabaseSyncBackend(
     // ── Schema ───────────────────────────────────────────────────────────────
 
     companion object {
+        data class ResolvedJdbcConfig(
+            val jdbcUrl: String,
+            val user: String,
+            val password: String,
+            val inlineUser: String? = null,
+            val inlinePassword: String? = null
+        )
+
         /**
          * Full DDL shown in the settings UI and applied automatically on first use.
          * Copy this into your database if you prefer to create the tables manually.
@@ -70,17 +80,107 @@ class DatabaseSyncBackend(
             |    PRIMARY KEY  (workspace_id, version)
             |);
         """.trimMargin().trim()
+
+        /**
+         * JDBC allows credentials either as explicit DriverManager arguments or inline in the URL
+         * (for example: ?user=...&password=...).  We support both to make PostgreSQL/Supabase
+         * examples pasteable directly into the UI, but normalise the URL so credentials can be
+         * shown/stored in dedicated fields afterwards.
+         */
+        fun resolveConnection(jdbcUrl: String, explicitUser: String = "", explicitPassword: String = ""): ResolvedJdbcConfig {
+            val trimmedUrl = jdbcUrl.trim()
+            val inlineParams = parseQueryParams(trimmedUrl)
+            val (inlineUserInfoUser, inlineUserInfoPassword) = parseUserInfo(trimmedUrl)
+            val inlineUser = inlineParams["user"] ?: inlineUserInfoUser
+            val inlinePassword = inlineParams["password"] ?: inlineUserInfoPassword
+            return ResolvedJdbcConfig(
+                jdbcUrl = sanitizeJdbcUrl(trimmedUrl),
+                user = explicitUser.ifBlank { inlineUser.orEmpty() },
+                password = explicitPassword.ifBlank { inlinePassword.orEmpty() },
+                inlineUser = inlineUser,
+                inlinePassword = inlinePassword
+            )
+        }
+
+        private fun parseQueryParams(jdbcUrl: String): Map<String, String> {
+            val rawQuery = jdbcUrl.substringAfter('?', "")
+            if (rawQuery.isBlank()) return emptyMap()
+            return rawQuery.split('&')
+                .asSequence()
+                .filter { it.isNotBlank() }
+                .map { part ->
+                    val key = part.substringBefore('=')
+                    val value = part.substringAfter('=', "")
+                    decode(key).lowercase() to decode(value)
+                }
+                .toMap()
+        }
+
+        private fun parseUserInfo(jdbcUrl: String): Pair<String?, String?> {
+            val authority = jdbcUrl.substringAfter("://", "").substringBefore('/').substringBefore('?')
+            if ('@' !in authority) return null to null
+            val userInfo = authority.substringBefore('@')
+            if (userInfo.isBlank()) return null to null
+            return decode(userInfo.substringBefore(':')).ifBlank { null } to
+                decode(userInfo.substringAfter(':', "")).ifBlank { null }
+        }
+
+        private fun sanitizeJdbcUrl(jdbcUrl: String): String {
+            if (jdbcUrl.isBlank()) return jdbcUrl
+
+            val basePart = jdbcUrl.substringBefore('?')
+            val queryPart = jdbcUrl.substringAfter('?', "")
+
+            val sanitizedBase = basePart.replaceFirst(Regex("^(jdbc:[^:]+://)[^/@?]+@"), "$1")
+            val sanitizedQuery = queryPart.split('&')
+                .filter { it.isNotBlank() }
+                .filterNot {
+                    val key = decode(it.substringBefore('='))
+                    key.equals("user", ignoreCase = true) || key.equals("password", ignoreCase = true)
+                }
+                .joinToString("&")
+
+            return buildString {
+                append(sanitizedBase)
+                if (sanitizedQuery.isNotBlank()) {
+                    append('?')
+                    append(sanitizedQuery)
+                }
+            }
+        }
+
+        private fun decode(value: String): String = URLDecoder.decode(value, StandardCharsets.UTF_8)
     }
 
     // ── Connection + schema helpers ──────────────────────────────────────────
 
-    private fun openConnection(): Connection = DriverManager.getConnection(jdbcUrl, user, password)
+    /**
+     * IntelliJ plugins load JARs via a child classloader that DriverManager cannot see.
+     * Explicitly registering the driver on every call is idempotent and is the only
+     * reliable way to bridge the classloader gap inside the plugin sandbox.
+     */
+    private fun openConnection(): Connection {
+        val resolved = resolveConnection(jdbcUrl, user, password)
+        val driverClass = if (isPostgres) "org.postgresql.Driver" else "org.sqlite.JDBC"
+        val driver = Class.forName(driverClass, true, this::class.java.classLoader)
+            .getDeclaredConstructor().newInstance() as java.sql.Driver
+        // Register with DriverManager if not already registered
+        runCatching { DriverManager.registerDriver(driver) }
+        return when {
+            resolved.user.isBlank() && resolved.password.isBlank() -> DriverManager.getConnection(resolved.jdbcUrl)
+            else -> DriverManager.getConnection(resolved.jdbcUrl, resolved.user, resolved.password)
+        }
+    }
 
     private fun Connection.applySchema() {
+        val executableSql = SCHEMA_DDL.lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotBlank() && !it.startsWith("--") }
+            .joinToString("\n")
         createStatement().use { stmt ->
-            SCHEMA_DDL.split(";")
+            executableSql.split(";")
                 .map { it.trim() }
-                .filter { it.isNotBlank() && !it.startsWith("--") }
+                .filter { it.isNotBlank() }
                 .forEach { stmt.execute(it) }
         }
     }
@@ -159,7 +259,7 @@ class DatabaseSyncBackend(
                 if (current != null) {
                     val archiveSql = if (isPostgres)
                         """INSERT INTO sqlfolio_workspace_history (workspace_id, version, data)
-                           VALUES (?, ?, ?) ON CONFLICT DO NOTHING"""
+                           VALUES (?, ?, ?) ON CONFLICT (workspace_id, version) DO NOTHING"""
                     else
                         "INSERT OR IGNORE INTO sqlfolio_workspace_history (workspace_id, version, data) VALUES (?, ?, ?)"
                     conn.prepareStatement(archiveSql).use { ps ->

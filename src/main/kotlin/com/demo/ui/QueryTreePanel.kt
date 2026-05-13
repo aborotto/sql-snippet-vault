@@ -10,6 +10,8 @@ import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.openapi.options.ShowSettingsUtil
+import com.demo.sync.SQLFolioSettingsConfigurable
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
@@ -167,6 +169,13 @@ class QueryTreePanel(
             add(object : AnAction("Import from JSON", "Import a previously exported query library", AllIcons.Actions.Install) {
                 override fun actionPerformed(e: AnActionEvent) {
                     QueryImportExportService.import(project, storage) { refresh() }
+                }
+            })
+            addSeparator()
+            add(object : AnAction("Sync Settings", "Open SQLFolio Sync settings", AllIcons.General.Settings) {
+                override fun actionPerformed(e: AnActionEvent) {
+                    ShowSettingsUtil.getInstance()
+                        .showSettingsDialog(project, SQLFolioSettingsConfigurable::class.java)
                 }
             })
         }

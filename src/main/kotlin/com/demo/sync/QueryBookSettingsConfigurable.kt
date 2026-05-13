@@ -33,11 +33,16 @@ class SQLFolioSettingsConfigurable : Configurable {
     private lateinit var serverUrlField: JTextField
     private lateinit var apiTokenField:  JPasswordField
 
-    // ── Database panel ────────────────────────────────────────────────────────
+    // ── PostgreSQL panel ──────────────────────────────────────────────────────
     private lateinit var jdbcUrlField:         JTextField
     private lateinit var dbUserField:          JTextField
     private lateinit var dbPasswordField:      JPasswordField
     private lateinit var retentionSpinner:     JSpinner
+    private lateinit var jdbcUrlInfoLabel:     JLabel
+
+    // ── SQLite panel (separate fields — a Swing component can only have one parent) ──
+    private lateinit var sqliteJdbcUrlField:   JTextField
+    private lateinit var sqliteRetentionSpinner: JSpinner
 
     override fun getDisplayName() = "SQLFolio Sync"
 
@@ -69,14 +74,27 @@ class SQLFolioSettingsConfigurable : Configurable {
         dbUserField     = JTextField(40)
         dbPasswordField = JPasswordField(40)
         retentionSpinner = JSpinner(SpinnerNumberModel(10, 1, 100, 1))
+        jdbcUrlInfoLabel = JLabel("<html><small>You can paste a full JDBC URL. SQLFolio can read <code>user</code> and <code>password</code> from it.</small></html>")
+
+        val extractCredentialsButton = JButton("Extract from JDBC URL").apply {
+            toolTipText = "Populate the User / Password fields from the JDBC URL and remove them from the URL"
+            addActionListener { extractCredentialsFromJdbcUrl() }
+        }
+        val jdbcHelperRow = JPanel(BorderLayout(8, 0)).apply {
+            isOpaque = false
+            add(extractCredentialsButton, BorderLayout.WEST)
+        }
 
         val pgHint = JLabel(
             "<html><small><i>Example: <code>jdbc:postgresql://localhost:5432/mydb</code><br>" +
+            "You may also paste a full PostgreSQL JDBC URL with inline credentials.<br>" +
             "Tables are created automatically. Real-time via LISTEN/NOTIFY (≤ 200 ms).</i></small></html>"
         ).apply { border = JBUI.Borders.emptyTop(4) }
 
         val pgForm = FormBuilder.createFormBuilder()
             .addLabeledComponent("JDBC URL:",              jdbcUrlField,     true)
+            .addComponent(jdbcUrlInfoLabel)
+            .addComponent(jdbcHelperRow)
             .addLabeledComponent("User:",                  dbUserField,      true)
             .addLabeledComponent("Password:",              dbPasswordField,  true)
             .addLabeledComponent("Keep last N versions:",  retentionSpinner, true)
@@ -85,16 +103,18 @@ class SQLFolioSettingsConfigurable : Configurable {
             .panel
 
         // ── SQLite panel ──────────────────────────────────────────────────────
-        val sqliteJdbcField = jdbcUrlField  // same field, reused
+        // Uses its OWN separate field instances — a Swing component can only belong to one parent
+        sqliteJdbcUrlField    = JTextField(40)
+        sqliteRetentionSpinner = JSpinner(SpinnerNumberModel(10, 1, 100, 1))
 
         val sqliteHint = JLabel(
-            "<html><small><i>Example: <code>jdbc:sqlite:/home/shared/sqlfolio.db</code><br>" +
+            "<html><small><i>Example: <code>jdbc:sqlite:C:/shared/sqlfolio.db</code><br>" +
             "Leave User/Password empty. Real-time via file watcher (≤ 1 s).</i></small></html>"
         ).apply { border = JBUI.Borders.emptyTop(4) }
 
         val sqliteForm = FormBuilder.createFormBuilder()
-            .addLabeledComponent("SQLite file (JDBC URL):", sqliteJdbcField, true)
-            .addLabeledComponent("Keep last N versions:",   retentionSpinner, true)
+            .addLabeledComponent("SQLite file (JDBC URL):", sqliteJdbcUrlField,    true)
+            .addLabeledComponent("Keep last N versions:",   sqliteRetentionSpinner, true)
             .addComponent(sqliteHint)
             .addComponent(buildSchemaPanel())
             .panel
@@ -112,7 +132,13 @@ class SQLFolioSettingsConfigurable : Configurable {
                 else -> BackendType.REST.name
             }
             cardLayout.show(cardPanel, key)
+            refreshJdbcUrlInfo()
         }
+
+        jdbcUrlField.document.addDocumentListener(simpleDocumentListener {
+            maybeAutofillCredentialsFromJdbcUrl()
+            refreshJdbcUrlInfo()
+        })
 
         // ── Test button ───────────────────────────────────────────────────────
         val testButton = JButton("Test Connection").apply {
@@ -156,15 +182,18 @@ class SQLFolioSettingsConfigurable : Configurable {
             || serverUrlField.text.trim()                != s.serverUrl
             || String(apiTokenField.password)            != s.apiToken
             || jdbcUrlField.text.trim()                  != s.jdbcUrl
+            || sqliteJdbcUrlField.text.trim()            != s.jdbcUrl
             || dbUserField.text.trim()                   != s.dbUser
             || String(dbPasswordField.password)          != s.dbPassword
             || retentionSpinner.value as Int             != s.retentionVersions
+            || sqliteRetentionSpinner.value as Int       != s.retentionVersions
     }
 
     override fun apply() {
         val s = SQLFolioSyncSettings.getInstance()
         s.syncEnabled         = enabledCheckbox.isSelected
-        s.backendType         = when (backendTypeCombo.selectedIndex) {
+        val backendIdx        = backendTypeCombo.selectedIndex
+        s.backendType         = when (backendIdx) {
             1    -> BackendType.POSTGRESQL.name
             2    -> BackendType.SQLITE.name
             else -> BackendType.REST.name
@@ -173,10 +202,16 @@ class SQLFolioSettingsConfigurable : Configurable {
         s.syncIntervalSeconds = syncIntervalSpinner.value as Int
         s.serverUrl           = serverUrlField.text.trim()
         s.apiToken            = String(apiTokenField.password)
-        s.jdbcUrl             = jdbcUrlField.text.trim()
+        // Pick the active panel's JDBC fields
+        if (backendIdx == 2) {
+            s.jdbcUrl           = sqliteJdbcUrlField.text.trim()
+            s.retentionVersions = sqliteRetentionSpinner.value as Int
+        } else {
+            s.jdbcUrl           = jdbcUrlField.text.trim()
+            s.retentionVersions = retentionSpinner.value as Int
+        }
         s.dbUser              = dbUserField.text.trim()
         s.dbPassword          = String(dbPasswordField.password)
-        s.retentionVersions   = retentionSpinner.value as Int
         if (!s.syncEnabled) s.lastSyncedVersion = 0
     }
 
@@ -188,12 +223,16 @@ class SQLFolioSettingsConfigurable : Configurable {
         syncIntervalSpinner.value      = s.syncIntervalSeconds
         serverUrlField.text            = s.serverUrl
         apiTokenField.text             = s.apiToken
+        // Populate both JDBC panels from the same stored value
         jdbcUrlField.text              = s.jdbcUrl
+        sqliteJdbcUrlField.text        = s.jdbcUrl
         dbUserField.text               = s.dbUser
         dbPasswordField.text           = s.dbPassword
         retentionSpinner.value         = s.retentionVersions
+        sqliteRetentionSpinner.value   = s.retentionVersions
         statusLabel.text               = " "
         cardLayout.show(cardPanel, s.resolvedBackendType().name)
+        refreshJdbcUrlInfo()
     }
 
     // ── Test connection ───────────────────────────────────────────────────────
@@ -207,13 +246,19 @@ class SQLFolioSettingsConfigurable : Configurable {
                 if (url.isBlank()) { statusLabel.text = "⚠  Enter a Server URL first."; return }
                 RestSyncBackend(url, token)
             }
-            1, 2 -> {
+            1 -> {
                 val jdbc = jdbcUrlField.text.trim()
                 val user = dbUserField.text.trim()
                 val pass = String(dbPasswordField.password)
                 val ret  = retentionSpinner.value as Int
                 if (jdbc.isBlank()) { statusLabel.text = "⚠  Enter a JDBC URL first."; return }
                 DatabaseSyncBackend(jdbc, user, pass, ret)
+            }
+            2 -> {
+                val jdbc = sqliteJdbcUrlField.text.trim()
+                val ret  = sqliteRetentionSpinner.value as Int
+                if (jdbc.isBlank()) { statusLabel.text = "⚠  Enter a SQLite file path first."; return }
+                DatabaseSyncBackend(jdbc, "", "", ret)
             }
             else -> null
         }
@@ -229,6 +274,55 @@ class SQLFolioSettingsConfigurable : Configurable {
             }
         }.start()
     }
+
+    private fun maybeAutofillCredentialsFromJdbcUrl() {
+        val resolved = DatabaseSyncBackend.resolveConnection(jdbcUrlField.text)
+        if (resolved.inlineUser != null && dbUserField.text.isBlank()) {
+            dbUserField.text = resolved.inlineUser
+        }
+        if (resolved.inlinePassword != null && String(dbPasswordField.password).isBlank()) {
+            dbPasswordField.text = resolved.inlinePassword
+        }
+    }
+
+    private fun extractCredentialsFromJdbcUrl() {
+        val resolved = DatabaseSyncBackend.resolveConnection(jdbcUrlField.text)
+        val foundUser = !resolved.inlineUser.isNullOrBlank()
+        val foundPassword = !resolved.inlinePassword.isNullOrBlank()
+        if (!foundUser && !foundPassword) {
+            statusLabel.text = "ℹ No inline user/password found in the JDBC URL."
+            refreshJdbcUrlInfo()
+            return
+        }
+
+        if (foundUser) dbUserField.text = resolved.inlineUser
+        if (foundPassword) dbPasswordField.text = resolved.inlinePassword
+        jdbcUrlField.text = resolved.jdbcUrl
+        statusLabel.text = "✅ Imported credentials from JDBC URL into separate fields."
+        refreshJdbcUrlInfo()
+    }
+
+    private fun refreshJdbcUrlInfo() {
+        if (!::jdbcUrlInfoLabel.isInitialized) return
+        val resolved = DatabaseSyncBackend.resolveConnection(jdbcUrlField.text)
+        jdbcUrlInfoLabel.text = when {
+            resolved.inlineUser != null || resolved.inlinePassword != null ->
+                "<html><small>Detected inline credentials in the JDBC URL.${if (resolved.inlineUser != null) " User: <code>${escapeHtml(resolved.inlineUser)}</code>." else ""} They can be used directly or extracted into the separate fields.</small></html>"
+            else ->
+                "<html><small>You can paste a full JDBC URL. SQLFolio can read <code>user</code> and <code>password</code> from it.</small></html>"
+        }
+    }
+
+    private fun simpleDocumentListener(onChange: () -> Unit) = object : javax.swing.event.DocumentListener {
+        override fun insertUpdate(e: javax.swing.event.DocumentEvent?) = onChange()
+        override fun removeUpdate(e: javax.swing.event.DocumentEvent?) = onChange()
+        override fun changedUpdate(e: javax.swing.event.DocumentEvent?) = onChange()
+    }
+
+    private fun escapeHtml(value: String): String = value
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
 
     // ── Schema info panel ─────────────────────────────────────────────────────
 

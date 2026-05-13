@@ -5,7 +5,7 @@ plugins {
 }
 
 group   = "com.sqlfolio"
-version = "1.2.0"
+version = "1.1.0"
 
 // Set the JVM language level used to build the project.
 kotlin {
@@ -53,4 +53,5 @@ tasks {
     wrapper {
         gradleVersion = providers.gradleProperty("gradleVersion").get()
     }
+
 }

@@ -27,20 +27,17 @@
     ]]></description>
 
     <change-notes><![CDATA[
-        <b>1.2.0</b>
-        <ul>
-            <li><b>BYOB Sync</b> — bring your own backend: connect via REST API, PostgreSQL or SQLite</li>
-            <li><b>Real-time sync</b> — PostgreSQL uses LISTEN/NOTIFY (≤ 200 ms), SQLite uses file watcher (≤ 1 s)</li>
-            <li><b>Version history</b> — every push archives the previous snapshot; configurable retention (default: last 10)</li>
-            <li><b>Sync status bar</b> — live status indicator at the bottom of the panel with Push Now / Pull Now buttons</li>
-            <li><b>Schema info</b> — settings page shows the exact DDL with a Copy SQL button</li>
-            <li>Auto-connect on project open</li>
-        </ul>
         <b>1.1.0</b>
         <ul>
             <li>Renamed plugin to SQLFolio</li>
-            <li>New plugin icon</li>
+            <li>New plugin icon (orange → purple gradient)</li>
             <li>Fixed deprecated API usages (ToolWindowFactory)</li>
+            <li><b>BYOB Sync</b> — bring your own backend: connect via REST API, PostgreSQL or SQLite</li>
+            <li><b>Real-time sync</b> — PostgreSQL uses LISTEN/NOTIFY (≤ 200 ms), SQLite uses file watcher (≤ 1 s)</li>
+            <li><b>Version history</b> — every push archives the previous snapshot; configurable retention (default: last 10)</li>
+            <li><b>Sync status bar</b> — live status indicator with Push Now / Pull Now buttons</li>
+            <li><b>Schema info</b> — settings page shows the exact DDL with a Copy SQL button</li>
+            <li>Auto-connect on project open</li>
         </ul>
         <b>1.0.0</b>
         <ul>
