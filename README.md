@@ -1,14 +1,16 @@
 # SQLFolio
 
-> **Your SQL query library, inside your IDE — shared with your team in real time.**
+> **Your SQL query library, inside your IDE -- shared with your team in real time.**
 
 SQLFolio is a plugin for **DataGrip** and all IntelliJ-based IDEs that lets you save, organize, and reuse SQL snippets without leaving the editor. Connect a shared database and your entire team sees the same library, live.
 
 ---
 
-## ✨ Features
+## Features
+------
 
-### 📁 Query Library
+### Query Library
+---
 
 | Feature | Description |
 |---------|-------------|
@@ -22,7 +24,8 @@ SQLFolio is a plugin for **DataGrip** and all IntelliJ-based IDEs that lets you 
 | **Export to JSON** | Export your full library to a portable `.json` file |
 | **Import from JSON** | Restore a previously exported library |
 
-### 🔍 Search
+### Search
+---
 
 | Feature | Description |
 |---------|-------------|
@@ -31,7 +34,8 @@ SQLFolio is a plugin for **DataGrip** and all IntelliJ-based IDEs that lets you 
 | **Preview on hover** | Hover over any query to see the first 6 lines of SQL as a tooltip |
 | **Context menu** | Right-click any item to rename, delete, duplicate or copy SQL |
 
-### ⚡ Editor Integration
+### Editor Integration
+---
 
 | Feature | Description |
 |---------|-------------|
@@ -41,7 +45,8 @@ SQLFolio is a plugin for **DataGrip** and all IntelliJ-based IDEs that lets you 
 | **SQL syntax highlighting** | Full syntax-highlighted SQL editor with IntelliJ's language engine |
 | **Description / notes** | Each query has a free-text notes field below the editor |
 
-### 🔄 Team Sync (BYOB — Bring Your Own Backend)
+### Team Sync (BYOB -- Bring Your Own Backend)
+---
 
 Connect your own database and share your query library with your team in real time. No cloud, no subscriptions — your data stays on your infrastructure.
 
@@ -102,7 +107,8 @@ CREATE TABLE IF NOT EXISTS sqlfolio_workspace_history (
 
 ---
 
-## 🚀 Installation
+## Installation
+------
 
 **From JetBrains Marketplace:**
 1. Open Settings → Plugins → Marketplace
@@ -114,7 +120,8 @@ Download the `.zip` from [Releases](https://github.com/aborotto/sql-snippet-vaul
 
 ---
 
-## ⚙️ Quick Start
+## Quick Start
+------
 
 1. Open **View → Tool Windows → SQLFolio**
 2. Select SQL in any editor and press `Ctrl+Alt+Q` to save it
@@ -123,7 +130,8 @@ Download the `.zip` from [Releases](https://github.com/aborotto/sql-snippet-vaul
 
 ---
 
-## 🔄 Setting Up Team Sync
+## Setting Up Team Sync
+------
 
 ### Self-Hosted Sync (BYOB)
 
@@ -139,13 +147,15 @@ Download the `.zip` from [Releases](https://github.com/aborotto/sql-snippet-vaul
 
 ---
 
-## ☁️ Cloud Sharing Setup
+## Cloud Sharing Setup
+------
 
 SQLFolio supports cloud-hosted databases for seamless team collaboration. Choose a cloud provider and configure your sync settings.
 
 ### Cloud Providers (Recommended)
 
-#### **1. PostgreSQL Cloud**
+#### 1. PostgreSQL Cloud
+---
 
 **AWS RDS (PostgreSQL)**
 1. Create a PostgreSQL database on AWS RDS
@@ -172,7 +182,8 @@ SQLFolio supports cloud-hosted databases for seamless team collaboration. Choose
 5. Click **Test Connection** → **Create Tables Now**
 6. Share the Workspace ID with your team
 
-#### **2. SQLite Cloud**
+#### 2. SQLite Cloud
+---
 
 For smaller teams, SQLite with cloud storage:
 
@@ -187,7 +198,8 @@ For smaller teams, SQLite with cloud storage:
 
 > **Note:** SQLite cloud requires the file to be on a synced folder accessible to all team members.
 
-#### **3. REST API (Custom Backend)**
+#### 3. REST API (Custom Backend)
+---
 
 For teams with custom infrastructure:
 
@@ -200,7 +212,8 @@ For teams with custom infrastructure:
 
 ---
 
-## 🔐 Security Best Practices
+## Security Best Practices
+------
 
 - **Never commit credentials** to version control
 - **Use strong passwords** for cloud databases
@@ -212,7 +225,8 @@ For teams with custom infrastructure:
 
 ---
 
-## ⌨️ Keyboard Shortcuts
+## Keyboard Shortcuts
+------
 
 | Shortcut | Action |
 |----------|--------|
@@ -224,7 +238,8 @@ For teams with custom infrastructure:
 
 ---
 
-## 🛠️ Development
+## Development
+------
 
 **Prerequisites:** JDK 21+, IntelliJ IDEA or DataGrip
 
@@ -236,6 +251,7 @@ cd sql-snippet-vault
 
 ---
 
-## 📄 License
+## License
+------
 
 MIT License
