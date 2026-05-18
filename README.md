@@ -125,6 +125,8 @@ Download the `.zip` from [Releases](https://github.com/aborotto/sql-snippet-vaul
 
 ## 🔄 Setting Up Team Sync
 
+### Self-Hosted Sync (BYOB)
+
 1. Go to **Settings → Tools → SQLFolio Sync**
 2. Choose your backend: **PostgreSQL** (recommended), SQLite, or REST API
 3. Enter your JDBC URL, credentials, and schema name
@@ -134,6 +136,79 @@ Download the `.zip` from [Releases](https://github.com/aborotto/sql-snippet-vaul
 7. Enable sync → **OK**
 
 > Everyone on the team must use the **same Workspace ID** to share the same library.
+
+---
+
+## ☁️ Cloud Sharing Setup
+
+SQLFolio supports cloud-hosted databases for seamless team collaboration. Choose a cloud provider and configure your sync settings.
+
+### Cloud Providers (Recommended)
+
+#### **1. PostgreSQL Cloud**
+
+**AWS RDS (PostgreSQL)**
+1. Create a PostgreSQL database on AWS RDS
+2. Copy the endpoint (e.g., `mydb.c9akciq32.us-east-1.rds.amazonaws.com`)
+3. In SQLFolio Settings, use JDBC URL: `jdbc:postgresql://mydb.c9akciq32.us-east-1.rds.amazonaws.com:5432/queryvolume`
+4. Enter your RDS admin username and password
+5. Set Schema to `public` (or your desired schema)
+6. Click **Test Connection** → **Create Tables Now**
+7. Share the Workspace ID with your team
+
+**Azure Database for PostgreSQL**
+1. Create a PostgreSQL server on Azure
+2. Copy the server name (e.g., `myserver.postgres.database.azure.com`)
+3. In SQLFolio Settings, use JDBC URL: `jdbc:postgresql://myserver.postgres.database.azure.com:5432/querydb`
+4. Enter your Azure credentials
+5. Click **Test Connection** → **Create Tables Now**
+6. Share the Workspace ID with your team
+
+**Google Cloud SQL (PostgreSQL)**
+1. Create a Cloud SQL PostgreSQL instance
+2. Get the public IP address and configure authorized networks
+3. In SQLFolio Settings, use JDBC URL: `jdbc:postgresql://<PUBLIC_IP>:5432/sqlfolio_db`
+4. Enter your Cloud SQL credentials
+5. Click **Test Connection** → **Create Tables Now**
+6. Share the Workspace ID with your team
+
+#### **2. SQLite Cloud**
+
+For smaller teams, SQLite with cloud storage:
+
+1. Store your SQLite database (`.db` file) in:
+   - **Dropbox** → Configure sync folder path
+   - **OneDrive** → Configure sync folder path
+   - **Google Drive** → Configure sync folder path (via Drive for Desktop)
+2. In SQLFolio Settings, select SQLite backend
+3. Point to the synced database file path
+4. Set Poll Interval to **3-5 seconds** for cloud sync
+5. Share the file path with your team members
+
+> **Note:** SQLite cloud requires the file to be on a synced folder accessible to all team members.
+
+#### **3. REST API (Custom Backend)**
+
+For teams with custom infrastructure:
+
+1. Implement the [SQLFolio REST API spec](https://github.com/aborotto/sql-snippet-vault/wiki/REST-API)
+2. Deploy to your cloud server
+3. In SQLFolio Settings, select REST API backend
+4. Enter the API base URL and authentication token (if required)
+5. Click **Test Connection**
+6. Share the API URL and token securely with your team
+
+---
+
+## 🔐 Security Best Practices
+
+- **Never commit credentials** to version control
+- **Use strong passwords** for cloud databases
+- **Enable SSL/TLS** connections (PostgreSQL: `sslmode=require`)
+- **Restrict network access** to your database (IP whitelisting)
+- **Use IAM roles** where available (AWS, Azure, GCP)
+- **Rotate credentials** regularly
+- **Back up the tables** (`sqlfolio_workspaces`, `sqlfolio_workspace_history`) regularly
 
 ---
 
