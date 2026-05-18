@@ -5,6 +5,7 @@ import com.demo.model.QueryStorage
 import com.demo.model.QuerySavedListener
 import com.demo.action.SaveToSQLFolioDialog
 import com.demo.service.QueryImportExportService
+import com.demo.sync.SQLFolioSyncService
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.AnAction
@@ -168,7 +169,7 @@ class QueryTreePanel(
             })
             add(object : AnAction("Import from JSON", "Import a previously exported query library", AllIcons.Actions.Install) {
                 override fun actionPerformed(e: AnActionEvent) {
-                    QueryImportExportService.import(project, storage) { refresh() }
+                    QueryImportExportService.import(project, storage) { refresh(); notifySync() }
                 }
             })
             addSeparator()
@@ -305,6 +306,7 @@ class QueryTreePanel(
             sqlCode = if (isFolder) "" else "-- Write your SQL here"
         )
         refresh()
+        notifySync()
     }
 
     /**
@@ -337,6 +339,7 @@ class QueryTreePanel(
         )
         project.messageBus.syncPublisher(QuerySavedListener.TOPIC).querySaved()
         refresh()
+        notifySync()
     }
 
     private fun deleteNode(node: DefaultMutableTreeNode) {
@@ -348,6 +351,7 @@ class QueryTreePanel(
             removeFromModel(storage.root, obj)
             onNodeSelected(null)
             refresh()
+            notifySync()
         }
     }
 
@@ -362,6 +366,7 @@ class QueryTreePanel(
         }
         obj.name = newName
         findUiNode(treeRoot, obj)?.let { treeModel.nodeChanged(it) }
+        notifySync()
     }
 
     private fun duplicateNode(node: DefaultMutableTreeNode) {
@@ -384,6 +389,7 @@ class QueryTreePanel(
         val insertIdx = (parentData.children.indexOf(obj) + 1).coerceIn(0, parentData.children.size)
         parentData.children.add(insertIdx, copy)
         refresh()
+        notifySync()
     }
 
     // ── Context menu ───────────────────────────────────────────────────────────
@@ -568,7 +574,7 @@ class QueryTreePanel(
                 finalIdx = finalIdx.coerceIn(0, targetParent.children.size)
 
                 targetParent.children.add(finalIdx, srcObj)
-                UIUtil.invokeLaterIfNeeded { refresh() }
+                UIUtil.invokeLaterIfNeeded { refresh(); notifySync() }
             }
         })
 
@@ -676,5 +682,10 @@ class QueryTreePanel(
     /** Find the UI node that wraps [dataNode] (used only for ancestor checks). */
     private fun resolveUiNode(dataNode: QueryNode): DefaultMutableTreeNode? =
         findUiNode(treeRoot, dataNode)
+
+    /** Notify the sync service that a local change happened — triggers debounced auto-push. */
+    private fun notifySync() {
+        SQLFolioSyncService.getInstance(project).notifyChanged()
+    }
 }
 

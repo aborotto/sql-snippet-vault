@@ -37,11 +37,20 @@ class DatabaseSyncBackend(
     private val jdbcUrl:           String,
     private val user:              String,
     private val password:          String,
-    val          retentionVersions: Int = 10
+    val          retentionVersions: Int = 10,
+    private val dbSchema:          String = "",
+    private val maxPayloadKb:      Int    = 5120
 ) : SyncBackend {
 
     private val gson       = GsonBuilder().create()
     private val isPostgres get() = jdbcUrl.startsWith("jdbc:postgresql")
+
+    // ── Schema-aware table names ──────────────────────────────────────────────
+
+    /** Quoted schema prefix, e.g. `"myschema".` or empty for default search_path. */
+    private val schemaPrefix get() = if (dbSchema.isBlank()) "" else "\"$dbSchema\"."
+    private val tWorkspaces  get() = "${schemaPrefix}sqlfolio_workspaces"
+    private val tHistory     get() = "${schemaPrefix}sqlfolio_workspace_history"
 
     // ── Schema ───────────────────────────────────────────────────────────────
 
@@ -57,29 +66,36 @@ class DatabaseSyncBackend(
         /**
          * Full DDL shown in the settings UI and applied automatically on first use.
          * Copy this into your database if you prefer to create the tables manually.
+         * Pass a [schema] name to prefix the tables (e.g. "myschema" → "myschema".sqlfolio_workspaces).
          */
-        val SCHEMA_DDL = """
-            |-- ┌─────────────────────────────────────────────────────────────┐
-            |-- │  SQLFolio — required database schema                        │
-            |-- │  Auto-created by the plugin; safe to run manually too.      │
-            |-- └─────────────────────────────────────────────────────────────┘
-            |
-            |-- Current live state (one row per workspace)
-            |CREATE TABLE IF NOT EXISTS sqlfolio_workspaces (
-            |    id      TEXT    PRIMARY KEY,
-            |    version INTEGER NOT NULL DEFAULT 0,
-            |    data    TEXT    NOT NULL   -- JSON-serialised QueryNode tree
-            |);
-            |
-            |-- Rolling version history (last N snapshots per workspace)
-            |CREATE TABLE IF NOT EXISTS sqlfolio_workspace_history (
-            |    workspace_id TEXT    NOT NULL,
-            |    version      INTEGER NOT NULL,
-            |    data         TEXT    NOT NULL,
-            |    saved_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            |    PRIMARY KEY  (workspace_id, version)
-            |);
-        """.trimMargin().trim()
+        fun buildSchemaDdl(schema: String = ""): String {
+            val prefix = if (schema.isBlank()) "" else "\"$schema\"."
+            return """
+                |-- ┌─────────────────────────────────────────────────────────────┐
+                |-- │  SQLFolio — required database schema                        │
+                |-- │  Auto-created by the plugin; safe to run manually too.      │
+                |-- └─────────────────────────────────────────────────────────────┘
+                |
+                |-- Current live state (one row per workspace)
+                |CREATE TABLE IF NOT EXISTS ${prefix}sqlfolio_workspaces (
+                |    id      TEXT    PRIMARY KEY,
+                |    version INTEGER NOT NULL DEFAULT 0,
+                |    data    TEXT    NOT NULL   -- JSON-serialised QueryNode tree
+                |);
+                |
+                |-- Rolling version history (last N snapshots per workspace)
+                |CREATE TABLE IF NOT EXISTS ${prefix}sqlfolio_workspace_history (
+                |    workspace_id TEXT    NOT NULL,
+                |    version      INTEGER NOT NULL,
+                |    data         TEXT    NOT NULL,
+                |    saved_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                |    PRIMARY KEY  (workspace_id, version)
+                |);
+            """.trimMargin().trim()
+        }
+
+        /** Default DDL with no schema prefix — used for display in the settings panel. */
+        val SCHEMA_DDL get() = buildSchemaDdl()
 
         /**
          * JDBC allows credentials either as explicit DriverManager arguments or inline in the URL
@@ -164,16 +180,30 @@ class DatabaseSyncBackend(
         val driverClass = if (isPostgres) "org.postgresql.Driver" else "org.sqlite.JDBC"
         val driver = Class.forName(driverClass, true, this::class.java.classLoader)
             .getDeclaredConstructor().newInstance() as java.sql.Driver
-        // Register with DriverManager if not already registered
         runCatching { DriverManager.registerDriver(driver) }
-        return when {
-            resolved.user.isBlank() && resolved.password.isBlank() -> DriverManager.getConnection(resolved.jdbcUrl)
-            else -> DriverManager.getConnection(resolved.jdbcUrl, resolved.user, resolved.password)
+
+        val props = java.util.Properties().apply {
+            if (resolved.user.isNotBlank())     setProperty("user",     resolved.user)
+            if (resolved.password.isNotBlank()) setProperty("password", resolved.password)
+            if (isPostgres) {
+                setProperty("loginTimeout",  "10")  // max seconds to establish connection
+                setProperty("socketTimeout", "30")  // max seconds waiting for DB response
+                setProperty("connectTimeout","10")
+            }
         }
+        return if (props.isEmpty)
+            DriverManager.getConnection(resolved.jdbcUrl)
+        else
+            DriverManager.getConnection(resolved.jdbcUrl, props)
+    }
+
+    /** Public entry point to create the SQLFolio tables in the configured schema. */
+    fun createSchema() {
+        openConnection().use { conn -> conn.applySchema() }
     }
 
     private fun Connection.applySchema() {
-        val executableSql = SCHEMA_DDL.lineSequence()
+        val executableSql = buildSchemaDdl(this@DatabaseSyncBackend.dbSchema).lineSequence()
             .map { it.trim() }
             .filter { it.isNotBlank() && !it.startsWith("--") }
             .joinToString("\n")
@@ -189,9 +219,25 @@ class DatabaseSyncBackend(
 
     override fun testConnection(): Boolean {
         openConnection().use { conn ->
-            conn.applySchema()
             conn.createStatement().use { stmt ->
                 stmt.executeQuery("SELECT 1").use { return it.next() }
+            }
+        }
+    }
+
+    /**
+     * Returns the list of workspace IDs already stored in the database.
+     * Used by the settings UI to let the user browse and pick an existing workspace.
+     */
+    fun listWorkspaces(): List<String> {
+        openConnection().use { conn ->
+            conn.applySchema()
+            conn.prepareStatement("SELECT id FROM $tWorkspaces ORDER BY id").use { ps ->
+                ps.executeQuery().use { rs ->
+                    val result = mutableListOf<String>()
+                    while (rs.next()) result.add(rs.getString("id"))
+                    return result
+                }
             }
         }
     }
@@ -202,7 +248,7 @@ class DatabaseSyncBackend(
         openConnection().use { conn ->
             conn.applySchema()
             conn.prepareStatement(
-                "SELECT version, data FROM sqlfolio_workspaces WHERE id = ?"
+                "SELECT version, data FROM $tWorkspaces WHERE id = ?"
             ).use { ps ->
                 ps.setString(1, workspaceId)
                 ps.executeQuery().use { rs ->
@@ -225,9 +271,9 @@ class DatabaseSyncBackend(
             try {
                 // 1. Lock + read current row
                 val lockSql = if (isPostgres)
-                    "SELECT version, data FROM sqlfolio_workspaces WHERE id = ? FOR UPDATE"
+                    "SELECT version, data FROM $tWorkspaces WHERE id = ? FOR UPDATE"
                 else
-                    "SELECT version, data FROM sqlfolio_workspaces WHERE id = ?"
+                    "SELECT version, data FROM $tWorkspaces WHERE id = ?"
 
                 data class CurrentRow(val version: Int, val data: String)
 
@@ -258,10 +304,10 @@ class DatabaseSyncBackend(
                 // 3. Archive current version to history
                 if (current != null) {
                     val archiveSql = if (isPostgres)
-                        """INSERT INTO sqlfolio_workspace_history (workspace_id, version, data)
+                        """INSERT INTO $tHistory (workspace_id, version, data)
                            VALUES (?, ?, ?) ON CONFLICT (workspace_id, version) DO NOTHING"""
                     else
-                        "INSERT OR IGNORE INTO sqlfolio_workspace_history (workspace_id, version, data) VALUES (?, ?, ?)"
+                        "INSERT OR IGNORE INTO $tHistory (workspace_id, version, data) VALUES (?, ?, ?)"
                     conn.prepareStatement(archiveSql).use { ps ->
                         ps.setString(1, workspaceId)
                         ps.setInt(2, current.version)
@@ -272,11 +318,11 @@ class DatabaseSyncBackend(
 
                 // 4. Upsert new version into main table
                 val upsertSql = if (isPostgres)
-                    """INSERT INTO sqlfolio_workspaces (id, version, data) VALUES (?, ?, ?)
+                    """INSERT INTO $tWorkspaces (id, version, data) VALUES (?, ?, ?)
                        ON CONFLICT (id) DO UPDATE
                            SET version = EXCLUDED.version, data = EXCLUDED.data"""
                 else
-                    "INSERT OR REPLACE INTO sqlfolio_workspaces (id, version, data) VALUES (?, ?, ?)"
+                    "INSERT OR REPLACE INTO $tWorkspaces (id, version, data) VALUES (?, ?, ?)"
                 conn.prepareStatement(upsertSql).use { ps ->
                     ps.setString(1, workspaceId)
                     ps.setInt(2, newVersion)
@@ -286,11 +332,11 @@ class DatabaseSyncBackend(
 
                 // 5. Data-retention: delete history older than the last retentionVersions
                 conn.prepareStatement(
-                    """DELETE FROM sqlfolio_workspace_history
+                    """DELETE FROM $tHistory
                        WHERE workspace_id = ?
                          AND version <= (
                              SELECT COALESCE(MAX(version), 0) - ?
-                             FROM sqlfolio_workspace_history
+                             FROM $tHistory
                              WHERE workspace_id = ?
                          )"""
                 ).use { ps ->

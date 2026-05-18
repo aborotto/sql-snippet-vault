@@ -49,8 +49,12 @@ class SQLFolioSyncSettings : PersistentStateComponent<SQLFolioSyncSettings> {
     var jdbcUrl:           String = ""
     var dbUser:            String = ""
     var dbPassword:        String = ""
+    /** PostgreSQL schema that contains the SQLFolio tables (leave blank for the default search_path). */
+    var dbSchema:          String = ""
     /** How many historical snapshots to keep per workspace (1–100). Older ones are deleted on each push. */
     var retentionVersions: Int    = 10
+    /** Maximum JSON payload size in KB before a push is blocked (default 5 120 KB = 5 MB). */
+    var maxPayloadKb:      Int    = 5120
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -65,7 +69,7 @@ class SQLFolioSyncSettings : PersistentStateComponent<SQLFolioSyncSettings> {
         }
         BackendType.POSTGRESQL, BackendType.SQLITE -> {
             if (jdbcUrl.isBlank()) null
-            else DatabaseSyncBackend(jdbcUrl, dbUser, dbPassword, retentionVersions)
+            else DatabaseSyncBackend(jdbcUrl, dbUser, dbPassword, retentionVersions, dbSchema, maxPayloadKb)
         }
     }
 

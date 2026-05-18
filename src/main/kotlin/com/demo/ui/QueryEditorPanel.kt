@@ -1,6 +1,7 @@
 package com.demo.ui
 
 import com.demo.model.QueryNode
+import com.demo.sync.SQLFolioSyncService
 import com.intellij.icons.AllIcons
 import com.intellij.ide.scratch.ScratchRootType
 import com.intellij.lang.Language
@@ -136,7 +137,10 @@ class QueryEditorPanel(private val project: Project) {
     private fun wireListeners() {
         sqlEditor.addDocumentListener(object : DocumentListener {
             override fun documentChanged(event: DocumentEvent) {
-                if (!suppressUpdates) activeNode?.sqlCode = sqlEditor.text
+                if (!suppressUpdates) {
+                    activeNode?.sqlCode = sqlEditor.text
+                    notifySync()
+                }
             }
         })
 
@@ -145,9 +149,16 @@ class QueryEditorPanel(private val project: Project) {
             override fun removeUpdate(e: SwingDocumentEvent?) = persist()
             override fun changedUpdate(e: SwingDocumentEvent?) = persist()
             private fun persist() {
-                if (!suppressUpdates) activeNode?.description = descTextArea.text
+                if (!suppressUpdates) {
+                    activeNode?.description = descTextArea.text
+                    notifySync()
+                }
             }
         })
+    }
+
+    private fun notifySync() {
+        SQLFolioSyncService.getInstance(project).notifyChanged()
     }
 
     // ── Public API ─────────────────────────────────────────────────────────────

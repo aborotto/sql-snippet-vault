@@ -94,7 +94,7 @@ class SQLFolioSyncService(private val project: Project) : Disposable {
         executor.submit { doPull() }
         // Schedule periodic polling
         val interval = settings.syncIntervalSeconds.toLong().coerceAtLeast(10)
-        pollFuture = executor.scheduleAtFixedDelay(
+        pollFuture = executor.scheduleWithFixedDelay(
             { doPull() }, interval, interval, TimeUnit.SECONDS
         )
     }
@@ -148,6 +148,17 @@ class SQLFolioSyncService(private val project: Project) : Disposable {
         val b = backend ?: return
         status = SyncStatus.SYNCING
         try {
+            val json = com.google.gson.GsonBuilder().create().toJson(rootSnapshot)
+            val maxBytes = settings.maxPayloadKb.toLong() * 1024
+            if (json.toByteArray().size > maxBytes) {
+                status = SyncStatus.ERROR
+                showBalloon(
+                    "Push blocked: payload exceeds ${settings.maxPayloadKb} KB limit. " +
+                    "Reduce the number of queries or increase the limit in Settings → SQLFolio Sync.",
+                    NotificationType.WARNING
+                )
+                return
+            }
             val result = b.push(settings.workspaceId, version, rootSnapshot)
             if (result.conflict && result.root != null) {
                 status = SyncStatus.CONFLICT

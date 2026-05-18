@@ -1,6 +1,8 @@
 package com.demo.sync
 
 import com.intellij.openapi.options.Configurable
+import com.intellij.openapi.project.ProjectManager
+import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.FormBuilder
 import com.intellij.util.ui.JBUI
 import java.awt.BorderLayout
@@ -37,12 +39,15 @@ class SQLFolioSettingsConfigurable : Configurable {
     private lateinit var jdbcUrlField:         JTextField
     private lateinit var dbUserField:          JTextField
     private lateinit var dbPasswordField:      JPasswordField
+    private lateinit var dbSchemaField:        JTextField
     private lateinit var retentionSpinner:     JSpinner
+    private lateinit var maxPayloadSpinner:    JSpinner
     private lateinit var jdbcUrlInfoLabel:     JLabel
 
     // ── SQLite panel (separate fields — a Swing component can only have one parent) ──
-    private lateinit var sqliteJdbcUrlField:   JTextField
-    private lateinit var sqliteRetentionSpinner: JSpinner
+    private lateinit var sqliteJdbcUrlField:      JTextField
+    private lateinit var sqliteRetentionSpinner:  JSpinner
+    private lateinit var sqliteMaxPayloadSpinner: JSpinner
 
     override fun getDisplayName() = "SQLFolio Sync"
 
@@ -50,9 +55,19 @@ class SQLFolioSettingsConfigurable : Configurable {
         // ── Shared controls ───────────────────────────────────────────────────
         enabledCheckbox     = JCheckBox("Enable real-time team sync")
         backendTypeCombo    = JComboBox(arrayOf("REST API", "PostgreSQL", "SQLite"))
-        workspaceIdField    = JTextField(40)
+        workspaceIdField    = JTextField(30)
         syncIntervalSpinner = JSpinner(SpinnerNumberModel(60, 10, 3600, 10))
         statusLabel         = JLabel(" ")
+
+        val browseWorkspacesButton = JButton("Browse…").apply {
+            toolTipText = "Load existing workspaces from the database and pick one"
+            addActionListener { browseWorkspaces() }
+        }
+        val workspaceRow = JPanel(BorderLayout(6, 0)).apply {
+            isOpaque = false
+            add(workspaceIdField,       BorderLayout.CENTER)
+            add(browseWorkspacesButton, BorderLayout.EAST)
+        }
 
         // ── REST panel ────────────────────────────────────────────────────────
         serverUrlField = JTextField(40)
@@ -73,17 +88,10 @@ class SQLFolioSettingsConfigurable : Configurable {
         jdbcUrlField    = JTextField(40)
         dbUserField     = JTextField(40)
         dbPasswordField = JPasswordField(40)
+        dbSchemaField   = JTextField(40)
         retentionSpinner = JSpinner(SpinnerNumberModel(10, 1, 100, 1))
+        maxPayloadSpinner = JSpinner(SpinnerNumberModel(5120, 256, 102400, 256))
         jdbcUrlInfoLabel = JLabel("<html><small>You can paste a full JDBC URL. SQLFolio can read <code>user</code> and <code>password</code> from it.</small></html>")
-
-        val extractCredentialsButton = JButton("Extract from JDBC URL").apply {
-            toolTipText = "Populate the User / Password fields from the JDBC URL and remove them from the URL"
-            addActionListener { extractCredentialsFromJdbcUrl() }
-        }
-        val jdbcHelperRow = JPanel(BorderLayout(8, 0)).apply {
-            isOpaque = false
-            add(extractCredentialsButton, BorderLayout.WEST)
-        }
 
         val pgHint = JLabel(
             "<html><small><i>Example: <code>jdbc:postgresql://localhost:5432/mydb</code><br>" +
@@ -94,10 +102,11 @@ class SQLFolioSettingsConfigurable : Configurable {
         val pgForm = FormBuilder.createFormBuilder()
             .addLabeledComponent("JDBC URL:",              jdbcUrlField,     true)
             .addComponent(jdbcUrlInfoLabel)
-            .addComponent(jdbcHelperRow)
             .addLabeledComponent("User:",                  dbUserField,      true)
             .addLabeledComponent("Password:",              dbPasswordField,  true)
+            .addLabeledComponent("Schema (optional):",     dbSchemaField,    true)
             .addLabeledComponent("Keep last N versions:",  retentionSpinner, true)
+            .addLabeledComponent("Max payload (KB):",      maxPayloadSpinner, true)
             .addComponent(pgHint)
             .addComponent(buildSchemaPanel())
             .panel
@@ -106,6 +115,7 @@ class SQLFolioSettingsConfigurable : Configurable {
         // Uses its OWN separate field instances — a Swing component can only belong to one parent
         sqliteJdbcUrlField    = JTextField(40)
         sqliteRetentionSpinner = JSpinner(SpinnerNumberModel(10, 1, 100, 1))
+        sqliteMaxPayloadSpinner = JSpinner(SpinnerNumberModel(5120, 256, 102400, 256))
 
         val sqliteHint = JLabel(
             "<html><small><i>Example: <code>jdbc:sqlite:C:/shared/sqlfolio.db</code><br>" +
@@ -113,8 +123,9 @@ class SQLFolioSettingsConfigurable : Configurable {
         ).apply { border = JBUI.Borders.emptyTop(4) }
 
         val sqliteForm = FormBuilder.createFormBuilder()
-            .addLabeledComponent("SQLite file (JDBC URL):", sqliteJdbcUrlField,    true)
-            .addLabeledComponent("Keep last N versions:",   sqliteRetentionSpinner, true)
+            .addLabeledComponent("SQLite file (JDBC URL):", sqliteJdbcUrlField,        true)
+            .addLabeledComponent("Keep last N versions:",   sqliteRetentionSpinner,    true)
+            .addLabeledComponent("Max payload (KB):",       sqliteMaxPayloadSpinner,   true)
             .addComponent(sqliteHint)
             .addComponent(buildSchemaPanel())
             .panel
@@ -155,7 +166,7 @@ class SQLFolioSettingsConfigurable : Configurable {
             .addComponent(enabledCheckbox)
             .addSeparator()
             .addLabeledComponent("Back-end type:",       backendTypeCombo,    true)
-            .addLabeledComponent("Workspace ID:",        workspaceIdField,    true)
+            .addLabeledComponent("Workspace ID:",        workspaceRow,        true)
             .addLabeledComponent("Poll interval (sec):", syncIntervalSpinner, true)
             .addSeparator()
             .addComponent(cardPanel)
@@ -165,9 +176,16 @@ class SQLFolioSettingsConfigurable : Configurable {
 
         reset()
 
-        return JPanel(BorderLayout()).apply {
+        val contentPanel = JPanel(BorderLayout()).apply {
             add(mainForm, BorderLayout.NORTH)
-            preferredSize = Dimension(520, 0)
+        }
+
+        return JBScrollPane(contentPanel).apply {
+            border = null
+            horizontalScrollBarPolicy = JBScrollPane.HORIZONTAL_SCROLLBAR_NEVER
+            verticalScrollBarPolicy   = JBScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED
+            verticalScrollBar.unitIncrement = 16
+            preferredSize = Dimension(540, 600)
         }
     }
 
@@ -185,8 +203,11 @@ class SQLFolioSettingsConfigurable : Configurable {
             || sqliteJdbcUrlField.text.trim()            != s.jdbcUrl
             || dbUserField.text.trim()                   != s.dbUser
             || String(dbPasswordField.password)          != s.dbPassword
+            || dbSchemaField.text.trim()                 != s.dbSchema
             || retentionSpinner.value as Int             != s.retentionVersions
             || sqliteRetentionSpinner.value as Int       != s.retentionVersions
+            || maxPayloadSpinner.value as Int            != s.maxPayloadKb.coerceIn(256, 102400).let { if (it < 256) 5120 else it }
+            || sqliteMaxPayloadSpinner.value as Int      != s.maxPayloadKb.coerceIn(256, 102400).let { if (it < 256) 5120 else it }
     }
 
     override fun apply() {
@@ -202,17 +223,25 @@ class SQLFolioSettingsConfigurable : Configurable {
         s.syncIntervalSeconds = syncIntervalSpinner.value as Int
         s.serverUrl           = serverUrlField.text.trim()
         s.apiToken            = String(apiTokenField.password)
-        // Pick the active panel's JDBC fields
+        s.dbUser              = dbUserField.text.trim()
+        s.dbPassword          = String(dbPasswordField.password)
+        s.dbSchema            = dbSchemaField.text.trim()
+        // Pick the active panel's JDBC + retention + payload fields
         if (backendIdx == 2) {
             s.jdbcUrl           = sqliteJdbcUrlField.text.trim()
             s.retentionVersions = sqliteRetentionSpinner.value as Int
+            s.maxPayloadKb      = sqliteMaxPayloadSpinner.value as Int
         } else {
             s.jdbcUrl           = jdbcUrlField.text.trim()
             s.retentionVersions = retentionSpinner.value as Int
+            s.maxPayloadKb      = maxPayloadSpinner.value as Int
         }
-        s.dbUser              = dbUserField.text.trim()
-        s.dbPassword          = String(dbPasswordField.password)
         if (!s.syncEnabled) s.lastSyncedVersion = 0
+
+        // Reconnect the sync service in every open project so settings take effect immediately
+        ProjectManager.getInstance().openProjects.forEach { project ->
+            SQLFolioSyncService.getInstance(project).reconnect()
+        }
     }
 
     override fun reset() {
@@ -223,13 +252,16 @@ class SQLFolioSettingsConfigurable : Configurable {
         syncIntervalSpinner.value      = s.syncIntervalSeconds
         serverUrlField.text            = s.serverUrl
         apiTokenField.text             = s.apiToken
-        // Populate both JDBC panels from the same stored value
         jdbcUrlField.text              = s.jdbcUrl
         sqliteJdbcUrlField.text        = s.jdbcUrl
         dbUserField.text               = s.dbUser
         dbPasswordField.text           = s.dbPassword
+        dbSchemaField.text             = s.dbSchema
         retentionSpinner.value         = s.retentionVersions
         sqliteRetentionSpinner.value   = s.retentionVersions
+        val safePayload = if (s.maxPayloadKb < 256) 5120 else s.maxPayloadKb.coerceAtMost(102400)
+        maxPayloadSpinner.value        = safePayload
+        sqliteMaxPayloadSpinner.value  = safePayload
         statusLabel.text               = " "
         cardLayout.show(cardPanel, s.resolvedBackendType().name)
         refreshJdbcUrlInfo()
@@ -247,18 +279,21 @@ class SQLFolioSettingsConfigurable : Configurable {
                 RestSyncBackend(url, token)
             }
             1 -> {
-                val jdbc = jdbcUrlField.text.trim()
-                val user = dbUserField.text.trim()
-                val pass = String(dbPasswordField.password)
-                val ret  = retentionSpinner.value as Int
+                val jdbc   = jdbcUrlField.text.trim()
+                val user   = dbUserField.text.trim()
+                val pass   = String(dbPasswordField.password)
+                val ret    = retentionSpinner.value as Int
+                val schema = dbSchemaField.text.trim()
+                val maxKb  = maxPayloadSpinner.value as Int
                 if (jdbc.isBlank()) { statusLabel.text = "⚠  Enter a JDBC URL first."; return }
-                DatabaseSyncBackend(jdbc, user, pass, ret)
+                DatabaseSyncBackend(jdbc, user, pass, ret, schema, maxKb)
             }
             2 -> {
-                val jdbc = sqliteJdbcUrlField.text.trim()
-                val ret  = sqliteRetentionSpinner.value as Int
+                val jdbc  = sqliteJdbcUrlField.text.trim()
+                val ret   = sqliteRetentionSpinner.value as Int
+                val maxKb = sqliteMaxPayloadSpinner.value as Int
                 if (jdbc.isBlank()) { statusLabel.text = "⚠  Enter a SQLite file path first."; return }
-                DatabaseSyncBackend(jdbc, "", "", ret)
+                DatabaseSyncBackend(jdbc, "", "", ret, "", maxKb)
             }
             else -> null
         }
@@ -267,12 +302,75 @@ class SQLFolioSettingsConfigurable : Configurable {
             try {
                 val ok = candidate?.testConnection() == true
                 SwingUtilities.invokeLater {
-                    statusLabel.text = if (ok) "✅  Connected successfully!" else "❌  Could not connect."
+                    statusLabel.text = if (ok)
+                        "✅  Connected! Tables will be created automatically on first sync."
+                    else
+                        "❌  Could not connect. Check JDBC URL, user and password."
                 }
             } catch (e: Exception) {
                 SwingUtilities.invokeLater { statusLabel.text = "❌  ${e.message}" }
             }
         }.start()
+    }
+
+    // ── Browse workspaces ─────────────────────────────────────────────────────
+
+    private fun browseWorkspaces() {
+        val backendIdx = backendTypeCombo.selectedIndex
+        if (backendIdx == 0) {
+            statusLabel.text = "⚠  Browse is only available for PostgreSQL / SQLite backends."
+            return
+        }
+        val jdbc   = if (backendIdx == 2) sqliteJdbcUrlField.text.trim() else jdbcUrlField.text.trim()
+        val user   = dbUserField.text.trim()
+        val pass   = String(dbPasswordField.password)
+        val schema = dbSchemaField.text.trim()
+        val ret    = if (backendIdx == 2) sqliteRetentionSpinner.value as Int else retentionSpinner.value as Int
+        if (jdbc.isBlank()) {
+            statusLabel.text = "⚠  Enter a JDBC URL first, then browse workspaces."
+            return
+        }
+        statusLabel.text = "Loading workspaces…"
+        Thread {
+            try {
+                val backend = DatabaseSyncBackend(jdbc, user, pass, ret, schema)
+                val workspaces = backend.listWorkspaces()
+                SwingUtilities.invokeLater {
+                    showWorkspacePickerDialog(workspaces)
+                    statusLabel.text = " "
+                }
+            } catch (e: Exception) {
+                SwingUtilities.invokeLater {
+                    statusLabel.text = "❌  Could not load workspaces: ${e.message}"
+                }
+            }
+        }.start()
+    }
+
+    private fun showWorkspacePickerDialog(existing: List<String>) {
+        val options = (existing + listOf("＋ Create new…")).toTypedArray()
+        val choice = JOptionPane.showInputDialog(
+            null,
+            "Select an existing workspace or create a new one:",
+            "Browse Workspaces",
+            JOptionPane.PLAIN_MESSAGE,
+            null,
+            options,
+            if (workspaceIdField.text.isNotBlank() && existing.contains(workspaceIdField.text))
+                workspaceIdField.text else options.firstOrNull()
+        ) as? String ?: return
+
+        if (choice == "＋ Create new…") {
+            val newName = JOptionPane.showInputDialog(
+                null,
+                "Enter a name for the new workspace:",
+                "New Workspace",
+                JOptionPane.PLAIN_MESSAGE
+            )?.trim() ?: return
+            if (newName.isNotBlank()) workspaceIdField.text = newName
+        } else {
+            workspaceIdField.text = choice
+        }
     }
 
     private fun maybeAutofillCredentialsFromJdbcUrl() {
